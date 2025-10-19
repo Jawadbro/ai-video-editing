@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Agentic Video Editor</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f9f9f9;
+      color: #333;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    input[type="file"], textarea, button {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0 20px 0;
+      font-size: 16px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+    }
+    button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    #status {
+      margin-top: 20px;
+      padding: 15px;
+      background: #e9ecef;
+      border-radius: 5px;
+      min-height: 40px;
+    }
+    .download-link {
+      display: inline-block;
+      margin: 10px 10px 0 0;
+      padding: 10px 15px;
+      background: #28a745;
+      color: white;
+      text-decoration: none;
+      border-radius: 5px;
+    }
+    .download-link:hover {
+      background: #1e7e34;
+    }
+  </style>
+</head>
+<body>
+  <h1>Agentic Video Editor</h1>
+  <form id="uploadForm">
+    <label for="videoFile">Select Video File:</label>
+    <input type="file" id="videoFile" name="video" accept="video/*" required />
+
+    <label for="instruction">Editing Instruction:</label>
+    <textarea id="instruction" name="instruction" rows="3" placeholder="e.g. Make it vibrant for Instagram Stories" required></textarea>
+
+    <button type="submit">Upload & Process</button>
+  </form>
+
+  <div id="status"></div>
+  <div id="downloads"></div>
+
+  <script>
+    const form = document.getElementById('uploadForm');
+    const statusDiv = document.getElementById('status');
+    const downloadsDiv = document.getElementById('downloads');
+    let jobId = null;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      downloadsDiv.innerHTML = '';
+      statusDiv.textContent = 'Uploading video...';
+
+      const formData = new FormData();
+      const videoFile = document.getElementById('videoFile').files[0];
+      const instruction = document.getElementById('instruction').value;
+
+      formData.append('video', videoFile);
+      formData.append('instruction', instruction);
+
+      try {
+        const response = await fetch('/api/v1/upload', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+          jobId = data.job_id;
+          statusDiv.textContent = 'Upload successful! Processing started...';
+          pollStatus();
+        } else {
+          statusDiv.textContent = 'Error: ' + (data.error || 'Unknown error');
+        }
+      } catch (err) {
+        statusDiv.textContent = 'Upload failed: ' + err.message;
+      }
+    });
+
+    async function pollStatus() {
+      if (!jobId) return;
+
+      try {
+        const response = await fetch(`/api/v1/status/${jobId}`);
+        const data = await response.json();
+
+        if (data.status === 'processing') {
+          statusDiv.textContent = `Processing... Progress: ${data.progress || 0}%`;
+          setTimeout(pollStatus, 2000);
+        } else if (data.status === 'completed') {
+          statusDiv.textContent = 'Processing complete! Download your videos below:';
+          showDownloads(data.result.exports);
+        } else if (data.status === 'failed') {
+          statusDiv.textContent = 'Processing failed: ' + (data.error || 'Unknown error');
+        } else {
+          statusDiv.textContent = 'Status: ' + data.status;
+          setTimeout(pollStatus, 2000);
+        }
+      } catch (err) {
+        statusDiv.textContent = 'Error checking status: ' + err.message;
+      }
+    }
+
+    function showDownloads(exports) {
+      downloadsDiv.innerHTML = '';
+      if (!exports || exports.length === 0) {
+        downloadsDiv.textContent = 'No exported videos found.';
+        return;
+      }
+      exports.forEach(exp => {
+        const link = document.createElement('a');
+        link.href = `/api/v1/download/${jobId}/${exp.format_name}`;
+        link.textContent = `Download ${exp.format_name.toUpperCase()}`;
+        link.className = 'download-link';
+        link.download = '';
+        downloadsDiv.appendChild(link);
+      });
+    }
+  </script>
+</body>
+</html>
