@@ -1,0 +1,22 @@
+# Python cache files
+__pycache__/
+*.pyc
+
+# IDE/editor folders
+.idea/
+
+# Environment files
+
+# Temporary files and folders
+temp/
+*.log
+
+# Large media files (if you don't want to push them)
+*.mp4
+*.mov
+*.avi
+
+# Dependency folders (if applicable)
+venv/
+node_modules/
+config.bat
